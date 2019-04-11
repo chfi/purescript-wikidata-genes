@@ -12,6 +12,10 @@ import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Newtype (wrap)
+import Data.String (Pattern(..))
+import Data.String as String
 import Data.Traversable (traverse_)
 import Effect (Effect)
 import Effect.Aff (launchAff, launchAff_)
@@ -20,6 +24,8 @@ import Effect.Console (log)
 import Foreign (F, renderForeignError)
 import Global.Unsafe (unsafeStringify)
 import Simple.JSON (read', readJSON')
+import Types (Gene(..), HomologeneID(..))
+import Types as Types
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -48,19 +54,37 @@ type HomologeneIDQuery =
                , geneAltLabel :: RDFTerm }
 
 
-type HomologeneResultRow =
-  { species :: String
-  , geneURI :: String
-  , geneNames :: { primary :: String, aliases :: Array String } }
+-- type SpeciesGeneQuery =
+--   SPARQLResult { gene :: RDFTerm
+--                , homologeneID :: RDFTerm }
 
 
-homologeneResults :: HomologeneIDQuery -> Array HomologeneResultRow
-homologeneResults q = map f q.results.bindings
-  where f :: { gene :: _, species :: _, geneLabel :: _, geneAltLabel :: _ } -> HomologeneResultRow
-        f row = { species: row.species
-                , geneURI: row.gene
-                , geneNames: { primary: row.geneLabel, aliases: row.geneAltLabel } }
+type GeneSPARQLResult =
+  SPARQLResult { gene :: RDFTerm
+               , homologeneID :: RDFTerm
+               , geneLabel :: RDFTerm
+               , geneAltLabel :: RDFTerm
+               , species :: RDFTerm }
 
+
+-- type HomologeneResultRow =
+--   { species :: String
+--   , geneURI :: String
+--   , geneNames :: { primary :: String, aliases :: Array String } }
+
+
+homologeneResults :: HomologeneID -> HomologeneIDQuery -> Array Types.Gene
+homologeneResults id q = map f q.results.bindings
+  where f :: _ -> Types.Gene
+        -- f = unsafeCoerce
+        f result = Gene { species: wrap result.species.value
+                        , homologene: id
+                        , name: result.geneLabel.value
+                        , aliases: String.split (Pattern ", ") result.geneAltLabel.value
+                        , uri: result.gene.value }
+
+
+-- speciesGene
 
 
 -- query1 :: Request Json
@@ -91,3 +115,47 @@ homologeneQuery homologeneID =
   , "FILTER(LANG(?species) = \"en\")."
   , "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\" }"
   , "}"]
+
+
+data QueryError =
+    MissingSpecies
+  | MissingGene
+  | MissingAll
+
+geneQueryUnsafe :: { species :: Maybe String
+                   , geneName :: Maybe String
+                   , homologene :: Maybe String }
+                -> Request Json
+geneQueryUnsafe vars =
+  let taxon = maybe "?species" (\n -> "\"" <> n <> "\"") vars.species
+
+      geneLabel = case vars.geneName of
+        Nothing -> ""
+        Just n  -> "FILTER(STR(?label) = \""
+                   <> n <> "\" && LANG(?label) == \"en\")."
+
+      -- geneLabel = maybe "?label" ("\"" <> _ <> "\"") vars.geneName
+      homologeneID = maybe "?homologeneID" (\n -> "\"" <> n <> "\"") vars.homologene
+
+  in wikidataQueryRequest
+     $ foldMap (_ <> " ")
+
+     [ "SELECT ?gene ?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator=", ") AS ?geneAltLabel) ?homologeneID"
+     , "WHERE"
+     , "{"
+     , "?item wdt:P31 wd:Q7187"
+     , "rdfs:label ?label"
+     , "skos:altLabel ?altLabel"
+     , "wdt:P593", homologeneID
+     , "wdt:P703", taxon
+     , geneLabel
+     , "}"
+     , "GROUP BY ?gene ?geneLabel ?homologeneID" ]
+
+-- geneQuery :: { species :: Maybe String
+--              , geneName :: Maybe String
+--              , homologene :: Maybe String }
+--           -> Either QueryError (Request Json)
+-- geneQuery = case species, geneName, homologene of
+--   Nothing, Nothing, Just id ->
+--   Just s, Just g, Nothing   ->

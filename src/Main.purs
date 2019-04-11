@@ -12,6 +12,7 @@ import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
+import Data.Newtype (wrap)
 import Data.Traversable (traverse_)
 import Effect (Effect)
 import Effect.Aff (launchAff, launchAff_)
@@ -19,8 +20,11 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Foreign (F, renderForeignError)
 import Global.Unsafe (unsafeStringify)
+import Prim.RowList (Cons, Nil)
+import SPARQL as SPARQL
 import SPARQL.GeneAliases as SPARQL
 import Simple.JSON (read', readJSON')
+import Type.Prelude (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -80,6 +84,13 @@ main = launchAff_ do
 
   resp <- AX.request req
 
+  liftEffect do
+    traverse_ log $ SPARQL.keys (RLProxy :: _ (Cons "aaaa" Void (Cons "bbbb" Void Nil)))
+
+
+    log $ SPARQL.select { abc: unit, def: unit }
+
+  {-
   liftEffect $ log $ unsafeStringify resp
   case resp.body of
     Left err -> liftEffect $ log $ AX.printResponseFormatError err
@@ -94,4 +105,11 @@ main = launchAff_ do
           log "-----------------"
           log $ "Head: " <> (foldMap (_ <> ", ") rr.head.vars)
           -- log $ unsafeStringify rr
+
+
+          traverse_ (\r -> log $ show r) $ SPARQL.homologeneResults (wrap "22758") rr
+
+          log "-----------------"
           traverse_ (\r -> log $ r.geneLabel.value <> ": " <> r.gene.value <> " - " <> r.geneAltLabel.value) rr.results.bindings
+
+-}
