@@ -35,6 +35,9 @@ type RDFTerm = { "type" :: String, value :: String }
 type SPARQLResult a = { head :: { vars :: Array String }
                       , results :: { bindings :: Array a } }
 
+
+
+
 wikidataQueryRequest :: String -> Request Json
 wikidataQueryRequest query =
   defaultRequest { url = "https://query.wikidata.org/sparql?query=" <> query
