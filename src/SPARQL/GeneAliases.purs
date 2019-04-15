@@ -30,7 +30,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 
 -- | Ignores the xml:lang and other possible fields; we don't need them for now.
-type RDFTerm = { "type" :: String, value :: String }
+type RDFResult = { "type" :: String, value :: String }
 
 type SPARQLResult a = { head :: { vars :: Array String }
                       , results :: { bindings :: Array a } }
@@ -51,10 +51,10 @@ type Query1Result = SPARQLResult { gene :: { "type" :: String, value :: String }
 
 
 type HomologeneIDQuery =
-  SPARQLResult { gene :: RDFTerm
-               , species :: RDFTerm
-               , geneLabel :: RDFTerm
-               , geneAltLabel :: RDFTerm }
+  SPARQLResult { gene :: RDFResult
+               , species :: RDFResult
+               , geneLabel :: RDFResult
+               , geneAltLabel :: RDFResult }
 
 
 -- type SpeciesGeneQuery =
@@ -63,11 +63,11 @@ type HomologeneIDQuery =
 
 
 type GeneSPARQLResult =
-  SPARQLResult { gene :: RDFTerm
-               , homologeneID :: RDFTerm
-               , geneLabel :: RDFTerm
-               , geneAltLabel :: RDFTerm
-               , species :: RDFTerm }
+  SPARQLResult { gene :: RDFResult
+               , homologeneID :: RDFResult
+               , geneLabel :: RDFResult
+               , geneAltLabel :: RDFResult
+               , species :: RDFResult }
 
 
 -- type HomologeneResultRow =

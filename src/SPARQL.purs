@@ -67,7 +67,7 @@ data Triple = Triple Entity Predicate Entity
 --   keys _ = List.Cons first rest
 --     where first = reflectSymbol (SProxy :: _ name)
 --           rest = keys (RLProxy :: _ tail)
-
+{-
 
 data Select r = Select (Record r)
 
@@ -112,46 +112,17 @@ select' :: ∀ g ts rl.
         -> String
 select' slist = "SELECT " <> (foldMap (\v -> "?" <> v <> " ") $ slistKeys slist)
 
-
--- data
-
-{-
-
-Use something like I did here:
-    traverse_ log $ SPARQL.keys (RLProxy :: _ (Cons "aaaa" Void (Cons "bbbb" Void Nil)))
-
-I.e. just construct a rowlist where the type is "Void" at each label.
-
-In fact, could use Homogeneous with this.
-
-Then I just (""just"") want a function like
-
-∀ r. Homogeneous r Void
-  => RowToList r l
-  => List String -> Maybe (Select r)
+                -}
 
 
--}
-
-
--- class BuildSelect (row :: # Type) where
---   buildSelect ::
-
--- mkSelect :: ∀ r. Homogeneous r Void
---          =>
-
--- mkSelect ::
--- type RDFTriple
-
-
-
-printSelect' :: List String -> String
--- mkSelect vs = "SELECT " <> foldMap (_ <> " ") vs
-printSelect' = append "SELECT " <<< foldMap (_ <> " ")
+printSelect :: List String -> String
+printSelect = append "SELECT " <<< foldMap (_ <> " ")
 
 data GraphPattern a
   -- = Basic (List a)
   = Basic a
+  | Filter String
+  | Service String
   | Optional (GraphPattern a)
   | Group (List (GraphPattern a))
 
@@ -165,123 +136,100 @@ instance semigroupGraphPattern :: Semigroup (GraphPattern a) where
   append a           b            = Group $ List.fromFoldable [a, b]
 
 
+data RDFTerm =
+    IRI     String
+  | Literal String
+  | Blank   String
+
+derive instance eqRDFTerm :: Eq RDFTerm
+derive instance ordRDFTerm :: Ord RDFTerm
+derive instance genericRDFTerm :: Generic RDFTerm _
+
+instance showRDFTerm :: Show RDFTerm where
+  show (IRI str)     = str
+  show (Literal str) = show str
+  show (Blank str)   = "?" <> str
 
 
 
 
--- newtype Triple a = Triple { subject :: a
---                           , predicate :: a
---                           , object :: a }
+data Triple a = Triple a a a
 
--- derive instance newtypeTriple :: Newtype (Triple a) _
--- derive instance eqTriple :: Eq a => Eq (Triple a)
+triple :: RDFTerm -> RDFTerm -> RDFTerm -> GraphPattern (Triple RDFTerm)
+triple s p o = Basic $ Triple s p o
+
+subject :: RDFTerm -> RDFTerm -> RDFTerm -> GraphPattern (Triple RDFTerm)
+subject s p o = Basic $ Triple s p o
+
+predicate :: RDFTerm -> RDFTerm -> RDFTerm -> GraphPattern (Triple RDFTerm)
+predicate p s o = Basic $ Triple s p o
+
+object :: RDFTerm -> RDFTerm -> RDFTerm -> GraphPattern (Triple RDFTerm)
+object o s p = Basic $ Triple s p o
+
+type TriplePattern = GraphPattern (Triple RDFTerm)
+
+type Predicate = RDFTerm -> RDFTerm -> TriplePattern
 
 
-
--- mkTriple :: ∀ a. a -> a -> a -> Triple a
--- mkTriple subject predicate object = Triple { subject, predicate, object }
-
--- printTriple :: Triple String -> String
--- printTriple (Triple t) = t.subject   <> " "
---                       <> t.predicate <> " "
---                       <> t.object    <> ". "
-
--- printExpr :: Either String (Triple String) -> String
--- printExpr = either (_ <> " ") printTriple
-
--- printWhere :: List (Either String (Triple String)) -> String
--- printWhere ts = "WHERE { " <> foldMap printExpr ts <> "}"
-
-printGraphPattern :: GraphPattern String -> String
-printGraphPattern (Basic l) = l
+printGraphPattern :: GraphPattern (Triple RDFTerm) -> String
+printGraphPattern (Basic (Triple s p o)) = show s <> " " <> show p <> " " <> show o <> " ."
+printGraphPattern (Filter s) = "FILTER(" <> s <> ")."
+printGraphPattern (Service s) = "SERVICE " <> s
 printGraphPattern (Group gp) = "{ " <> (foldMap (\p -> printGraphPattern p <> " ") gp) <> " }"
 printGraphPattern (Optional gp) = "OPTIONAL { " <> printGraphPattern gp <> " }"
 
 
-hasHomologeneID :: String -> String -> GraphPattern String
-hasHomologeneID var id = Basic $ var <> " wdt:P593 " <> show id <> " ."
 
-isGene :: String -> GraphPattern String
-isGene var = Basic $ var <> " wdt:P31 wd:Q7187 ."
+wdt :: String -> RDFTerm
+wdt s = IRI $ "wdt:" <> s
 
-hasTaxon :: String -> String -> GraphPattern String
-hasTaxon var taxonURI = Basic $ var <> " wdt:P703 " <> taxonURI <> " ."
+wd :: String -> RDFTerm
+wd s = IRI $ "wd:" <> s
 
-hasLabel :: String -> String -> GraphPattern String
-hasLabel var label = Basic $ var <> " rdfs:label " <> label <> " ."
+hasHomologeneID :: Predicate
+hasHomologeneID = predicate $ wdt "P593"
 
-filter :: String -> GraphPattern String
-filter expr = Basic $ "FILTER(" <> expr <> "). "
-
-useLabelService :: GraphPattern String
-useLabelService = Basic "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\" }"
+instanceOf :: Predicate
+instanceOf = predicate (wdt "P31")
 
 
 
--- homologeneIDToTaxonGene :: String -> GraphPattern String
--- homologeneIDToTaxonGene id =
---   Group
---   $ List.fromFoldable
---   $ Basic
---   <$> [ "?gene wdt:P31 wd:Q7187 ;"
---       , "wdt:P593 \"" <> id <> "\" ;"
---       , "wdt:P703 ?tax_id ."
---       , "?tax_id rdfs:label ?species ."
---       , "FILTER(LANG(?species) = \"en\"). "
---       , "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\" }" ]
+isGene :: RDFTerm -> TriplePattern
+isGene var = var `instanceOf` wd "Q7187"
+
+hasTaxon :: RDFTerm -> RDFTerm -> TriplePattern
+hasTaxon = predicate (wdt "P703")
+
+hasLabel :: RDFTerm -> RDFTerm -> TriplePattern
+hasLabel = predicate (IRI "rdfs:label")
+
+filter :: ∀ a. String -> GraphPattern a
+filter expr = Filter expr
+
+useLabelService :: ∀ a. GraphPattern a
+useLabelService = Service "wikibase:label { bd:serviceParam wikibase:language \"en\" }"
 
 
-
-
-homologeneIDToTaxonAndGene :: String -> GraphPattern String
+homologeneIDToTaxonAndGene :: String -> GraphPattern (Triple RDFTerm)
 homologeneIDToTaxonAndGene id =
-     isGene "?gene"
-  <> "?gene" `hasHomologeneID` id
-  <> "?gene" `hasTaxon` "?tax_id"
-  <> "?tax_id" `hasLabel` "?species"
+  let gene = Blank "gene"
+      tax_id = Blank "tax_id"
+      species = Blank "species"
+  in isGene gene
+  <> gene `hasHomologeneID` (Literal id)
+  <> gene `hasTaxon` tax_id
+  <> tax_id `hasLabel` species
   <> filter "LANG(?species) = \"en\""
   <> useLabelService
 
-hasTaxonName :: String -> String -> GraphPattern String
-hasTaxonName var name = Basic $ var <> " wdt:P225 " <> name <> " ."
 
-hasTaxonCommonName :: String -> String -> GraphPattern String
+hasTaxonName :: Predicate
+hasTaxonName = predicate (wdt "P225")
+
+hasTaxonCommonName :: Predicate
 hasTaxonCommonName var name =
-    filter $ "STR(" <> var <> ") = " <> show name <> "). "
+    Filter $ "STR(" <> show var <> ") = " <> show name <> "). "
 
-
-isTaxon :: String -> GraphPattern String
-isTaxon var = Basic $ var <> " wdt:P31 wd:Q16521 ."
-
-taxonURIToName :: String -> String -> GraphPattern String
-taxonURIToName = hasTaxonName
--- taxonURIToName tax_id tax_name =
---   tax_id `hasTaxonName` tax_name
-
-taxonURIToCommonName :: String -> String -> GraphPattern String
-taxonURIToCommonName = hasTaxonCommonName
--- taxonURIToCommonName tax_id label =
-  -- tax_id `hasTaxonCommonName` label
-
-
-geneHasName :: String -> String -> GraphPattern String
-geneHasName = hasLabel
-
--- geneHasAliases =
-
--- taxonNameToURI =
-
-
--- data QueryPattern a = QP { boundVariables :: Set String
---                          ,
-
--- data QueryVar (name :: Symbol) = QueryVar
-
-
--- newtype TriplePattern = { subject :: String
---                         ,
--- newtype SPARQLQuery =
---   SPARQLQuery { queryVars :: Set String
---               , graphPattern :: GraphPattern String }
-
--- derive instance newtypeSPARQLQuery :: Newtype SPARQLQuery
+isTaxon :: RDFTerm -> TriplePattern
+isTaxon var = var `instanceOf` wd "Q7187"

@@ -23,6 +23,7 @@ import Foreign (F, renderForeignError)
 import Global.Unsafe (unsafeStringify)
 import Prim.RowList (Cons, Nil)
 import Record.Extra (type (:::), SCons, SLProxy(..), SNil, slistKeys)
+import SPARQL (RDFTerm(..), wdt)
 import SPARQL as SPARQL
 import SPARQL.GeneAliases as SPARQL
 import Simple.JSON (read', readJSON')
@@ -37,10 +38,12 @@ main = launchAff_ $ do
   let whereBlock = "WHERE "
                   <> (SPARQL.printGraphPattern
                     $ SPARQL.homologeneIDToTaxonAndGene "22758"
-                  <> SPARQL.Basic "?gene wdt:P593 ?homologeneID .")
+                   <> (SPARQL.triple (Blank "gene") (wdt "P593") (Blank "homologeneID")))
+
+                  -- <> SPARQL.Basic "?gene wdt:P593 ?homologeneID .")
 
   let req = SPARQL.wikidataQueryRequest
-            $  (SPARQL.printSelect' $ List.fromFoldable ["?gene", "?geneLabel", "?homologeneID", "?species", "?tax_id"])
+            $  (SPARQL.printSelect $ List.fromFoldable ["?gene", "?geneLabel", "?homologeneID", "?species", "?tax_id"])
             <> whereBlock
 
 
@@ -50,24 +53,10 @@ main = launchAff_ $ do
   resp <- AX.request req
 
   liftEffect do
-    -- traverse_ log $ SPARQL.keys (RLProxy :: _ (Cons "aaaa" Void (Cons "bbbb" Void Nil)))
-
-    -- log $ SPARQL.printSelect' SPARQL.exQuery.select
-    -- log "--------------"
-    -- log $ SPARQL.printWhere SPARQL.exQuery.whereQ
-    -- log "--------------"
-
-    -- log $ SPARQL.printGraphPattern SPARQL.exGP
-    -- log "--------------"
-
 
     log $ SPARQL.printGraphPattern $ SPARQL.homologeneIDToTaxonAndGene "22758"
     log "--------------"
 
-
-    -- log $ SPARQL.select' (SLProxy :: _ ("gene" ::: "geneLabel" :::
-
-    -- traverse_ log $ slistKeys $ SLProxy :: SLProxy ("aaaa" ::: "bbb" ::: "cccc" ::: SNil)
 
   liftEffect $ log $ unsafeStringify resp
   case resp.body of
@@ -81,11 +70,11 @@ main = launchAff_ $ do
         log "-----------------"
         log $ unsafeStringify (unsafeCoerce r).results.bindings
 
-        case runExcept (read' (unsafeCoerce r) :: F ( SPARQL.SPARQLResult { gene :: SPARQL.RDFTerm
-                                                                          , species :: SPARQL.RDFTerm
-                                                                          , geneLabel :: SPARQL.RDFTerm
-                                                                          , homologeneID :: SPARQL.RDFTerm
-                                                                          , tax_id :: SPARQL.RDFTerm } )) of
+        case runExcept (read' (unsafeCoerce r) :: F ( SPARQL.SPARQLResult { gene :: SPARQL.RDFResult
+                                                                          , species :: SPARQL.RDFResult
+                                                                          , geneLabel :: SPARQL.RDFResult
+                                                                          , homologeneID :: SPARQL.RDFResult
+                                                                          , tax_id :: SPARQL.RDFResult } )) of
 
           Left err -> log $ foldMap renderForeignError err
           Right rr -> do
