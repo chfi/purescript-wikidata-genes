@@ -62,21 +62,21 @@ WHERE
 
 #### Gene -> Gene name and aliases
 
-(unsure about this one, actually)
 
 ```sparql
-SELECT ?geneLabel ?geneAltLabel
+SELECT ?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator="; ") AS ?geneAltLabel)
 WHERE
 {
-    ?gene = <gene>
+    wd:Q18247422 rdfs:label ?geneLabel ;
+                 skos:altLabel ?geneAltLabel .
+
+    FILTER(LANG(?geneLabel) = "en" &&
+           LANG(?geneAltLabel) = "en").
 }
+GROUP BY ?geneLabel
 ```
 
 #### Auxiliary queries
-
-
-```sparql
-```
 
 ##### Taxon -> Taxon name and common name
 
@@ -95,15 +95,29 @@ WHERE
 
 Taxon name -> Taxon
 
-In this case, taxon name is "mus musculus"
+In this case, taxon name is "Mus musculus"
+```sparql
+SELECT ?taxon
+WHERE
+{
+    ?taxon wdt:P225 "Mus musculus".
+}
+```
+
+The more flexible way of doing this, by filtering on the lowercased
+scientific name, is extremely slow, for some reason:
 ```sparql
 SELECT ?taxon
 WHERE
 {
     ?taxon wdt:P225 ?taxonName.
-    FILTER(LCASE(?taxonName) = "mus musculus").
+    FILTER(STR(?taxonName) = "Mus musculus").
 }
 ```
+
+It works, but takes close to a minute. Probably best to avoid using
+this in production. That shouldn't be a problem, since there aren't
+that many species we're dealing with.
 
 Taxon common (English) name -> Taxon
 
@@ -118,6 +132,7 @@ WHERE
            LCASE(STR(?taxonCommon)) = "house mouse").
 }
 ```
+This works fine and responds in just a second or two.
 
 ##### Taxon and gene (name or alias) -> Gene
 
@@ -127,12 +142,12 @@ gene, find the corresponding HomologeneID.
 In this case, taxon is "Mus musculus", wd:Q83310 and gene label is "Add1".
 
 ```sparql
-SELECT ?homologeneID
+SELECT ?gene
 WHERE
 {
     ?gene wdt:P31 wd:Q7187 ;
           rdfs:label ?geneLabel ;
-          wdt: wd:Q83310 .
+          wdt:P703 wd:Q83310 .
 
     FILTER(STR(?geneLabel) = "Add1" &&
            LANG(?geneLabel) = "en").
@@ -142,12 +157,12 @@ WHERE
 In this case, taxon name is "Mus musculus", wd:Q83310 and gene alias is "AI256389".
 
 ```sparql
-SELECT ?homologeneID
+SELECT ?gene
 WHERE
 {
     ?gene wdt:P31 wd:Q7187 ;
           skos:altLabel ?geneAltLabel ;
-          wdt: wd:Q83310 .
+          wdt:P703 wd:Q83310 .
 
     FILTER(STR(?geneAltLabel) = "AI256389" &&
            LANG(?geneAltLabel) = "en").
