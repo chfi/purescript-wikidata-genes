@@ -145,12 +145,13 @@ derive instance eqRDFTerm :: Eq RDFTerm
 derive instance ordRDFTerm :: Ord RDFTerm
 derive instance genericRDFTerm :: Generic RDFTerm _
 
+showRDFTerm' :: RDFTerm -> String
+showRDFTerm' (IRI str)     = str
+showRDFTerm' (Literal str) = show str
+showRDFTerm' (Blank str)   = "?" <> str
+
 instance showRDFTerm :: Show RDFTerm where
-  show (IRI str)     = str
-  show (Literal str) = show str
-  show (Blank str)   = "?" <> str
-
-
+  show = showRDFTerm'
 
 
 data Triple a = Triple a a a
@@ -224,6 +225,7 @@ homologeneIDToTaxonAndGene id =
   <> useLabelService
 
 
+
 hasTaxonName :: Predicate
 hasTaxonName = predicate (wdt "P225")
 
@@ -233,3 +235,72 @@ hasTaxonCommonName var name =
 
 isTaxon :: RDFTerm -> TriplePattern
 isTaxon var = var `instanceOf` wd "Q7187"
+
+
+geneURIToGeneName :: RDFTerm -> GraphPattern (Triple RDFTerm)
+geneURIToGeneName = hasLabel
+
+
+
+homologeneIDToTaxonAndGene' :: String -> GraphPattern (Triple RDFTerm)
+homologeneIDToTaxonAndGene' id =
+  let gene = Blank "gene"
+      tax_id = Blank "tax_id"
+  in isGene gene
+  <> gene `hasHomologeneID` (Literal id)
+  <> gene `hasTaxon` tax_id
+
+geneToHomologeneID :: RDFTerm -> GraphPattern (Triple RDFTerm)
+geneToHomologeneID gene =
+  let homologeneID = Blank "homologeneID"
+  in gene `hasHomologeneID` homologeneID
+
+geneToNames :: RDFTerm -> GraphPattern (Triple RDFTerm)
+geneToNames gene =
+  let geneLabel = Blank "geneLabel"
+      geneAltLabel = Blank "geneAltLabel"
+  in gene `hasLabel` geneLabel
+  <> gene `predicate (IRI "skos:altLabel")` geneAltLabel
+  <> filter "LANG(?geneLabel) = \"en\" && LANG(?geneAltLabel) = \"en\""
+
+taxonNames :: RDFTerm -> GraphPattern (Triple RDFTerm)
+taxonNames taxon =
+  let taxonName = Blank "taxonName"
+      taxonCommonName = Blank "taxonCommonName"
+  in taxon `hasTaxonName` taxonName
+  <> taxon `hasTaxonCommonName` taxonCommon
+  <> filter "LANG(?taxonCommon) = \"en\""
+
+taxonFromName :: String -> GraphPattern (Triple RDFTerm)
+taxonFromName name =
+  let taxon = Blank "taxon"
+  in taxon `hasTaxonName` name
+
+taxonFromCommonName :: String -> GraphPattern (Triple RDFTerm)
+taxonFromCommonName name =
+  let taxon = Blank "taxon"
+      taxonCommonName = Blank "taxonCommonName"
+  in taxon `hasTaxonCommonName` name
+  <> filter $ "LANG(?taxonCommonName) = \"en\" \
+&& LCASE(STR(?taxonCommonName)) = "
+  <> show name <> ")"
+
+taxonAndGeneNameToGene :: RDFTerm -> String -> GraphPattern (Triple RDFTerm)
+taxonAndGeneNameToGene taxon name =
+  let gene = Blank "gene"
+      geneLabel = Blank "geneLabel"
+  in isGene gene
+  <> gene `hasLabel` geneLabel
+  <> gene `hasTaxon` taxon
+  <> filter $ "STR(" <> show geneLabel <> ") = " <> show name
+           <> " && LANG(" <> show geneLabel <> ") = \"en\""
+
+taxonAndGeneAliasToGene :: RDFTerm -> String -> GraphPattern (Triple RDFTerm)
+taxonAndGeneAliasToGene taxon alias =
+  let gene = Blank "gene"
+      geneAltLabel = Blank "geneAltLabel"
+  in isGene gene
+  <> gene `predicate (IRI "skos:altLabel")` geneAltLabel
+  <> gene `hasTaxon` taxon
+  <> filter $ "STR(" <> show geneAltLabel <> ") = " <> show alias
+           <> " && LANG(" <> show geneAltLabel <> ") = \"en\""
