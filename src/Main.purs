@@ -2,76 +2,34 @@ module Main where
 
 import Prelude
 
-import Affjax (Request, defaultRequest)
 import Affjax as AX
-import Affjax.ResponseFormat (json)
-import Affjax.ResponseFormat as ResponseFormat
-import Control.Monad.Except (runExcept)
-import Data.Argonaut.Core (Json)
 import Data.Either (Either(..))
-import Data.Foldable (foldMap)
-import Data.Generic.Rep (class Generic)
-import Data.HTTP.Method (Method(..))
-import Data.List as List
 import Data.Newtype (wrap)
-import Data.Traversable (traverse_)
 import Effect (Effect)
-import Effect.Aff (Aff, delay, launchAff, launchAff_)
-import Effect.Class (liftEffect)
+import Effect.Aff (Aff, delay, launchAff_)
 import Effect.Class.Console (log)
-import Foreign (F, renderForeignError)
 import Global.Unsafe (unsafeStringify)
-import Prim.RowList (Cons, Nil)
-import Record.Extra (type (:::), SCons, SLProxy(..), SNil, slistKeys)
-import SPARQL (RDFTerm(..), wdt, wd)
+import SPARQL (wd)
 import SPARQL as SPARQL
-import SPARQL.GeneAliases as SPARQL
-import Simple.JSON (read', readJSON')
-import Type.Prelude (RLProxy(..))
+import SPARQL.GeneAliases as GeneAliases
 import Unsafe.Coerce (unsafeCoerce)
 
 
-query1 =
-  "SELECT ?gene ?taxon WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.homologeneIDToTaxonAndGene' "22758")
+query1 = (GeneAliases.fromHomologeneID "22758").taxonAndGene
 
-query2 =
-  "SELECT ?homologeneID WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.geneToHomologeneID (wd "Q18247422"))
+query2 = (GeneAliases.fromGene (wd "Q18247422")).homologeneID
 
-query3 =
-  "SELECT ?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator=\"; \") AS ?geneAltLabel) WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.geneToNames (wd "Q18247422"))
+query3 = (GeneAliases.fromGene (wd "Q18247422")).names
 
-query4 =
-  "SELECT ?taxonName ?taxonCommonName WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.taxonNames (wd "Q83310"))
+query4 = (GeneAliases.taxonToNames (wd "Q83310")).scientific
 
-query5 =
-  "SELECT ?taxon WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.taxonFromName "Mus musculus")
+query5 = (GeneAliases.nameToTaxon "Mus musculus").scientific
 
-query6 =
-  "SELECT ?taxon WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.taxonFromCommonName "house mouse")
+query6 = (GeneAliases.nameToTaxon "house mouse").common
 
+query7 = GeneAliases.fromGeneLabel.name (wd "Q83310") "Add1"
 
-query7 =
-  "SELECT ?gene WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.taxonAndGeneNameToGene (wd "Q83310") "Add1")
-
-
-query8 =
-  "SELECT ?gene WHERE "
-  <> (SPARQL.printGraphPattern
-      $ SPARQL.taxonAndGeneAliasToGene (wd "Q83310") "AI256389")
+query8 = GeneAliases.fromGeneLabel.alias (wd "Q83310") "AI256389"
 
 
 

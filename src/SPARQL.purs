@@ -2,118 +2,17 @@ module SPARQL where
 
 import Prelude
 
-import Data.Either (Either(..), either)
+import Affjax (Request, defaultRequest)
+import Affjax.ResponseFormat (json)
+import Data.Argonaut.Core (Json)
+import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Semigroup (genericAppend, genericAppend')
+import Data.HTTP.Method (Method(..))
 import Data.List (List)
 import Data.List as List
-import Data.Newtype (class Newtype, wrap)
-import Data.Set (Set)
+import Data.Newtype (wrap)
 import Data.String as String
-import Data.Variant (Variant)
-import Prim.Row as Row
-import Prim.RowList (class RowToList, Cons, Nil, kind RowList)
-import Record as Record
-import Record.Extra (class Keys, class SListToRowList, slistKeys)
-import Type.Prelude (class IsSymbol, class TypeEquals, RLProxy(..), SProxy(..), reflectSymbol)
-import Type.Row (type (+))
-
-
-
-{-
-
-data IRI = IRI String
-
-data Literal = Lit String -- (Maybe String) (Maybe String)
-
-data Blank = Blank String
-
--- data RDFTerm =
---     IRI String
---   | Lit String
---   | Blank String
-
-type RDFTermRow  r = (iri :: IRI, lit :: Literal, blank :: Blank | r)
-type QueryVarRow r = (queryVar :: String | r)
-
-type EntityRow     = RDFTermRow (QueryVarRow ())
-type PredRow       = (iri :: IRI, queryVar :: String)
-
-type Entity    = Variant EntityRow
-type Predicate = Variant PredRow
-
-type QV = Variant (QueryVarRow ())
-
-
--- a select expression is either simply a variable name, or an (expression AS varName)
-data SelectExpr = SelVar String | SelExp String String
-
--- data
--- data Triple = Triple RDFTerm RDFTerm RDFTerm
--- data Triple s p o = Triple s p o
-data Triple = Triple Entity Predicate Entity
--}
-
--- class Keys (xs :: RowList) where
---   keys :: RLProxy xs -> List String
-
--- instance nilKeys :: Keys Nil where
---   keys _ = mempty
-
--- instance consKeys ::
---   ( IsSymbol name
---   , Keys tail
---   ) => Keys (Cons name ty tail) where
---   keys _ = List.Cons first rest
---     where first = reflectSymbol (SProxy :: _ name)
---           rest = keys (RLProxy :: _ tail)
-{-
-
-data Select r = Select (Record r)
-
-class BuildSelect
-      (qvarsList :: RowList)
-      (qvarsRow :: # Type)
-      | qvarsList -> qvarsRow where
-  printSelect :: RLProxy qvarsList
-              -> Record qvarsRow
-              -> String
-
-instance buildSelectNil ::
-  ( TypeEquals (Record tr) {}
-  ) => BuildSelect Nil tr where
-  printSelect _ _ = mempty
-
-instance buildSelectCons ::
-  ( IsSymbol name
-  , BuildSelect tail rowt
-  , Row.Lacks name rowt
-  , Row.Cons  name a rowt row
-  ) => BuildSelect (Cons name a tail) row where
-  printSelect _ r =
-    let name = SProxy :: _ name
-        str = " ?" <> (reflectSymbol (SProxy :: _ name))
-        rest = printSelect (RLProxy :: _ tail) (Record.delete name r)
-    in str <> rest
-
-
-select :: ∀ row list.
-          RowToList row list
-       => BuildSelect list row
-       => Record row
-       -> String
-select r = "SELECT " <> printSelect (RLProxy :: _ list) r
-
-
-select' :: ∀ g ts rl.
-           SListToRowList ts rl
-        => Keys rl
-        => g ts
-        -> String
-select' slist = "SELECT " <> (foldMap (\v -> "?" <> v <> " ") $ slistKeys slist)
-
-                -}
 
 
 printSelect :: List String -> String
@@ -313,7 +212,13 @@ taxonAndGeneAliasToGene taxon alias =
   <> filter ("STR(" <> show geneAltLabel <> ") = " <> show alias
              <> " && LANG(" <> show geneAltLabel <> ") = \"en\"")
 
-
 uriEncodeQuery :: String -> String
 uriEncodeQuery = String.replaceAll (wrap "&") (wrap "%26")
                  -- <<< String.replaceAll (wrap "|") (wrap "%7C")
+
+wikidataQueryRequest :: String -> Request Json
+wikidataQueryRequest query =
+  let query' = uriEncodeQuery query
+  in defaultRequest { url = "https://query.wikidata.org/sparql?query=" <> query'
+                    , method = Left GET
+                    , responseFormat = json }
