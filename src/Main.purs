@@ -16,14 +16,14 @@ import Data.List as List
 import Data.Newtype (wrap)
 import Data.Traversable (traverse_)
 import Effect (Effect)
-import Effect.Aff (launchAff, launchAff_)
+import Effect.Aff (Aff, delay, launchAff, launchAff_)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
+import Effect.Class.Console (log)
 import Foreign (F, renderForeignError)
 import Global.Unsafe (unsafeStringify)
 import Prim.RowList (Cons, Nil)
 import Record.Extra (type (:::), SCons, SLProxy(..), SNil, slistKeys)
-import SPARQL (RDFTerm(..), wdt)
+import SPARQL (RDFTerm(..), wdt, wd)
 import SPARQL as SPARQL
 import SPARQL.GeneAliases as SPARQL
 import Simple.JSON (read', readJSON')
@@ -31,63 +31,100 @@ import Type.Prelude (RLProxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 
+query1 =
+  "SELECT ?gene ?taxon WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.homologeneIDToTaxonAndGene' "22758")
+
+query2 =
+  "SELECT ?homologeneID WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.geneToHomologeneID (wd "Q18247422"))
+
+query3 =
+  "SELECT ?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator=\"; \") AS ?geneAltLabel) WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.geneToNames (wd "Q18247422"))
+
+query4 =
+  "SELECT ?taxonName ?taxonCommonName WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.taxonNames (wd "Q83310"))
+
+query5 =
+  "SELECT ?taxon WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.taxonFromName "Mus musculus")
+
+query6 =
+  "SELECT ?taxon WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.taxonFromCommonName "house mouse")
+
+
+query7 =
+  "SELECT ?gene WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.taxonAndGeneNameToGene (wd "Q83310") "Add1")
+
+
+query8 =
+  "SELECT ?gene WHERE "
+  <> (SPARQL.printGraphPattern
+      $ SPARQL.taxonAndGeneAliasToGene (wd "Q83310") "AI256389")
+
+
+
+testrunQuery :: String -> Aff Unit
+testrunQuery q = do
+  log "------------"
+  log "Query:"
+  log $ (SPARQL.uriEncodeQuery q)
+  log "------------"
+  let req = SPARQL.wikidataQueryRequest (SPARQL.uriEncodeQuery q)
+  resp <- AX.request req
+  log $ unsafeStringify resp
+  case resp.body of
+    Left err -> log $ AX.printResponseFormatError err
+    Right r  -> do
+
+      log $ unsafeStringify r
+      log "--    Head   -- "
+      log $ unsafeStringify (unsafeCoerce (unsafeCoerce r).head.vars :: Array String)
+      log "--  Bindings -- "
+      log $ unsafeStringify (unsafeCoerce r).results.bindings
+      log ""
+
+
+
+testQueries :: Aff Unit
+testQueries = do
+  testrunQuery query1 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query2 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query3 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query4 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query5 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query6 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query7 -- Works
+  delay (wrap 500.0)
+
+  testrunQuery query8 -- Works
+  delay (wrap 500.0)
+
 
 main :: Effect Unit
-main = launchAff_ $ do
+main = launchAff_ do
 
-  let whereBlock = "WHERE "
-                  <> (SPARQL.printGraphPattern
-                    $ SPARQL.homologeneIDToTaxonAndGene "22758"
-                   <> (SPARQL.triple (Blank "gene") (wdt "P593") (Blank "homologeneID")))
-
-                  -- <> SPARQL.Basic "?gene wdt:P593 ?homologeneID .")
-
-  let req = SPARQL.wikidataQueryRequest
-            $  (SPARQL.printSelect $ List.fromFoldable ["?gene", "?geneLabel", "?homologeneID", "?species", "?tax_id"])
-            <> whereBlock
-
-
-  liftEffect $ log whereBlock
-  liftEffect $ log "---------------"
-
-  resp <- AX.request req
-
-  liftEffect do
-
-    log $ SPARQL.printGraphPattern $ SPARQL.homologeneIDToTaxonAndGene "22758"
-    log "--------------"
-
-
-  liftEffect $ log $ unsafeStringify resp
-  case resp.body of
-    Left err -> liftEffect $ log $ AX.printResponseFormatError err
-    Right r  -> do
-      -- log r.statusText
-      liftEffect $ log $ unsafeStringify r
-      -- liftEffect $ case runExcept (read' (unsafeCoerce r) :: F ExampleResult) of
-
-      liftEffect $ do
-        log "-----------------"
-        log $ unsafeStringify (unsafeCoerce r).results.bindings
-
-        case runExcept (read' (unsafeCoerce r) :: F ( SPARQL.SPARQLResult { gene :: SPARQL.RDFResult
-                                                                          , species :: SPARQL.RDFResult
-                                                                          , geneLabel :: SPARQL.RDFResult
-                                                                          , homologeneID :: SPARQL.RDFResult
-                                                                          , tax_id :: SPARQL.RDFResult } )) of
-
-          Left err -> log $ foldMap renderForeignError err
-          Right rr -> do
-            log "-----------------"
-            log $ unsafeStringify rr.results
-            log "-----------------"
-            log $ "Head: " <> (foldMap (_ <> ", ") rr.head.vars)
-            -- log "-----------------"
-            -- log $ unsafeStringify rr
-
-            log "-----------------"
-            traverse_ (\r -> log $ r.geneLabel.value <> ": "
-                                <> r.gene.value <> " - "
-                                <> r.species.value <> " - "
-                                <> r.homologeneID.value <> " - "
-                                <> r.tax_id.value) rr.results.bindings
+  testQueries
