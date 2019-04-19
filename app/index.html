@@ -8,7 +8,19 @@
 
     <script>
 
-      // PS.Main.main();
+      PS.Main.fromHomologeneID("22758")(({vars, bindings}) => {
+          console.log("Query headers: ");
+          console.log(vars);
+
+          console.log("Results:");
+          bindings.forEach(console.log);
+
+      });
+
+      PS.Main.homologeneFromGene("Q17709877")(({vars, bindings}) => {
+          console.log("HomologeneID:");
+          bindings.forEach((hid) => console.log(hid.homologeneID.value));
+      });
 
     </script>
 
