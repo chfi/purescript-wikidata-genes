@@ -149,5 +149,3 @@ thing = List.fromFoldable
 
 main :: Effect Unit
 main = pure unit
-
-  log "hello world"
