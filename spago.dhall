@@ -18,6 +18,7 @@ You can edit this file as you like.
     , "record"
     , "record-extra"
     , "simple-json"
+    , "smolder"
     , "transformers"
     , "typelevel-prelude"
     , "uri"

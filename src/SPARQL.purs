@@ -3,6 +3,7 @@ module SPARQL where
 import Prelude
 
 import Affjax (Request, defaultRequest)
+import Affjax as AX
 import Affjax.ResponseFormat (json)
 import Data.Argonaut.Core (Json)
 import Data.Either (Either(..))
@@ -13,6 +14,9 @@ import Data.List (List)
 import Data.List as List
 import Data.Newtype (wrap)
 import Data.String as String
+import Effect.Aff (Aff, throwError)
+import Foreign (ForeignError(..), Foreign)
+import Unsafe.Coerce (unsafeCoerce)
 
 
 printSelect :: List String -> String
@@ -222,3 +226,44 @@ wikidataQueryRequest query =
   in defaultRequest { url = "https://query.wikidata.org/sparql?query=" <> query'
                     , method = Left GET
                     , responseFormat = json }
+
+
+
+
+wikidataPerformRequestGET :: String
+                             -- { select :: String
+                             -- , graphPattern :: GraphPattern (Triple RDFTerm) }
+                          -> Aff { vars :: Array String
+                                 , bindings :: Foreign
+                                 }
+wikidataPerformRequestGET query = do
+  let queryRequest = wikidataQueryRequest query
+                     -- $ "SELECT "
+                     -- <> query.select
+                     -- <> " WHERE " <> printGraphPattern query.graphPattern
+
+  resp <- AX.request queryRequest
+  case resp.body of
+    Left err -> throwError (unsafeCoerce err)
+    Right val -> let value' = unsafeCoerce val
+                 in pure { vars: value'.head.vars
+                         , bindings: unsafeCoerce (value'.results.bindings) }
+
+
+-- wikidataRequestJS :: ({ vars :: Array String
+--                       , bindings :: Foreign } -> Effect Unit)
+--                   -> String
+--                   -> Effect Unit
+-- wikidataRequestJS callback query = launchAff_ do
+--   results <- wikidataPerformRequestGET request
+--   liftEffect $ callback results
+
+
+-- wikidataRequestJS :: ({ vars :: Array String
+--                       , bindings :: Foreign } -> Effect Unit)
+--                   -> Aff { vars :: Array String
+--                          , bindings :: Foreign }
+--                   -> Effect Unit
+-- wikidataRequestJS callback request = launchAff_ do
+--   results <- request
+--   liftEffect $ callback results
