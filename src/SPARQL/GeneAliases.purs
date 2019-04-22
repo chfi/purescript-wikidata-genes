@@ -21,8 +21,9 @@ fromGene :: RDFTerm -> { homologeneID :: String
 fromGene gene =
   { homologeneID: queryString "?homologeneID"
                   $ SPARQL.geneToHomologeneID gene
-  , names: queryString "?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator=\"; \") AS ?geneAltLabel)"
-           $ SPARQL.geneToNames gene
+  , names: (queryString "?geneLabel (GROUP_CONCAT(DISTINCT ?geneAltLabel; separator=\"; \") AS ?geneAltLabel)"
+           $ SPARQL.geneToNames gene)
+           <> " GROUP BY ?geneLabel"
   }
 
 taxonToNames :: RDFTerm -> { scientific :: String

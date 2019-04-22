@@ -8,20 +8,32 @@
 
     <script>
 
+      let wd = (uri) => "http://www.wikidata.org/entity/" + uri;
+      let wdt = (uri) => "http://www.wikidata.org/prop/direct/" + uri;
+
+      // Get the genes with corresponding taxon for homologene ID 22758
       PS.Main.fromHomologeneID("22758")(({vars, bindings}) => {
+
+          // the `vars` field has an array of the names with bound results
           console.log("Query headers: ");
           console.log(vars);
 
+          // the `bindings` field has an array of objects,
+          // each with the fields in `vars`
           console.log("Results:");
           bindings.forEach(console.log);
 
-      });
+          bindings.forEach((x) => {
 
-      PS.Main.homologeneFromGene("Q17709877")(({vars, bindings}) => {
-          console.log("HomologeneID:");
-          bindings.forEach((hid) => console.log(hid.homologeneID.value));
-      });
+              console.log(x);
+              // For each gene, get the name and aliases
+              PS.Main.namesFromGene(x.gene.value)(({vars, bindings}) => {
+                  // print the semicolon-delimited aliases to console
+                  bindings.forEach((b) => console.log(b.geneAltLabel.value));
+              });
+          });
 
+      });
     </script>
 
   </body>

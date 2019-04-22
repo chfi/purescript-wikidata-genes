@@ -16,7 +16,7 @@ import Effect.Class.Console (log)
 import Effect.Uncurried (EffectFn1, mkEffectFn1, runEffectFn1)
 import Foreign (ForeignError(..), Foreign)
 import Global.Unsafe (unsafeStringify)
-import SPARQL (wd)
+import SPARQL (RDFTerm, uri)
 import SPARQL as SPARQL
 import SPARQL.GeneAliases as GeneAliases
 import Unsafe.Coerce (unsafeCoerce)
@@ -55,25 +55,33 @@ jsquery query = mkEffectFn1 \callback -> do
             bindings = val'.results.bindings
         in liftEffect $ runEffectFn1 callback {vars, bindings}
 
+
+wd :: String -> RDFTerm
+wd = SPARQL.wd
+
+wdt :: String -> RDFTerm
+wdt = SPARQL.wdt
+
+
 fromHomologeneID :: String -> JSQuery
 fromHomologeneID id =
   jsquery (GeneAliases.fromHomologeneID id).taxonAndGene
 
 homologeneFromGene :: String -> JSQuery
 homologeneFromGene geneURI =
-  jsquery (GeneAliases.fromGene (wd geneURI)).homologeneID
+  jsquery (GeneAliases.fromGene (uri geneURI)).homologeneID
 
 namesFromGene :: String -> JSQuery
 namesFromGene geneURI =
-  jsquery (GeneAliases.fromGene (wd geneURI)).names
+  jsquery (GeneAliases.fromGene (uri geneURI)).names
 
 scientificNameFromTaxon :: String -> JSQuery
 scientificNameFromTaxon taxonURI =
-  jsquery (GeneAliases.taxonToNames (wd taxonURI)).scientific
+  jsquery (GeneAliases.taxonToNames (uri taxonURI)).scientific
 
 commonNameFromTaxon :: String -> JSQuery
 commonNameFromTaxon taxonURI =
-  jsquery (GeneAliases.taxonToNames (wd taxonURI)).common
+  jsquery (GeneAliases.taxonToNames (uri taxonURI)).common
 
 taxonFromScientific :: String -> JSQuery
 taxonFromScientific name =
@@ -85,11 +93,11 @@ taxonFromCommon name =
 
 fromGeneName :: String -> String -> JSQuery
 fromGeneName taxon name =
-  jsquery $ GeneAliases.fromGeneLabel.name (wd taxon) name
+  jsquery $ GeneAliases.fromGeneLabel.name (uri taxon) name
 
 fromGeneAlias :: String -> String -> JSQuery
 fromGeneAlias taxon name =
-  jsquery $ GeneAliases.fromGeneLabel.alias (wd taxon) name
+  jsquery $ GeneAliases.fromGeneLabel.alias (uri taxon) name
 
 
 testrunQuery :: String -> Aff Unit

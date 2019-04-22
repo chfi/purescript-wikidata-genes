@@ -40,6 +40,7 @@ instance semigroupGraphPattern :: Semigroup (GraphPattern a) where
 
 data RDFTerm =
     IRI     String
+  | Prefix  String String
   | Literal String
   | Blank   String
 
@@ -48,9 +49,10 @@ derive instance ordRDFTerm :: Ord RDFTerm
 derive instance genericRDFTerm :: Generic RDFTerm _
 
 showRDFTerm' :: RDFTerm -> String
-showRDFTerm' (IRI str)     = str
-showRDFTerm' (Literal str) = show str
-showRDFTerm' (Blank str)   = "?" <> str
+showRDFTerm' (IRI str)       = "<" <> str <> ">"
+showRDFTerm' (Prefix px str) = px <> ":" <> str
+showRDFTerm' (Literal str)   = show str
+showRDFTerm' (Blank str)     = "?" <> str
 
 instance showRDFTerm :: Show RDFTerm where
   show = showRDFTerm'
@@ -83,12 +85,14 @@ printGraphPattern (Group gp) = "{ " <> (foldMap (\p -> printGraphPattern p <> " 
 printGraphPattern (Optional gp) = "OPTIONAL { " <> printGraphPattern gp <> " }"
 
 
+uri :: String -> RDFTerm
+uri = IRI
 
 wdt :: String -> RDFTerm
-wdt s = IRI $ "wdt:" <> s
+wdt s = Prefix "wdt" s
 
 wd :: String -> RDFTerm
-wd s = IRI $ "wd:" <> s
+wd s = Prefix "wd" s
 
 hasHomologeneID :: Predicate
 hasHomologeneID = predicate $ wdt "P593"
@@ -105,7 +109,7 @@ hasTaxon :: RDFTerm -> RDFTerm -> TriplePattern
 hasTaxon = predicate (wdt "P703")
 
 hasLabel :: RDFTerm -> RDFTerm -> TriplePattern
-hasLabel = predicate (IRI "rdfs:label")
+hasLabel = predicate (Prefix "rdfs" "label")
 
 filter :: ∀ a. String -> GraphPattern a
 filter expr = Filter expr
@@ -165,8 +169,8 @@ geneToNames gene =
   let geneLabel = Blank "geneLabel"
       geneAltLabel = Blank "geneAltLabel"
   in gene `hasLabel` geneLabel
-  <> gene `predicate (IRI "skos:altLabel")` geneAltLabel
-  -- <> filter "LANG(?geneLabel) = \"en\" && LANG(?geneAltLabel) = \"en\""
+  <> gene `predicate (Prefix "skos" "altLabel")` geneAltLabel
+  <> filter "LANG(?geneLabel) = \"en\" && LANG(?geneAltLabel) = \"en\""
 
 -- SELECT ?taxonName ?taxonCommonName
 taxonNames :: RDFTerm -> GraphPattern (Triple RDFTerm)
@@ -211,7 +215,7 @@ taxonAndGeneAliasToGene taxon alias =
   let gene = Blank "gene"
       geneAltLabel = Blank "geneAltLabel"
   in isGene gene
-  <> gene `predicate (IRI "skos:altLabel")` geneAltLabel
+  <> gene `predicate (Prefix "skos" "altLabel")` geneAltLabel
   <> gene `hasTaxon` taxon
   <> filter ("STR(" <> show geneAltLabel <> ") = " <> show alias
              <> " && LANG(" <> show geneAltLabel <> ") = \"en\"")
